@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Office 快捷鍵大全 (含 Mac/Win 切換 & 收藏)</title>
+    <!-- 引入 D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            overflow: hidden;
+            background-color: #f8fafc;
+        }
+
+        /* D3 圖表樣式 */
+        .node circle {
+            fill: #fff;
+            stroke-width: 2px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .node circle:hover {
+            stroke-width: 4px;
+            r: 8;
+        }
+
+        /* 搜尋/收藏匹配樣式 */
+        .node.matched circle {
+            fill: #fbbf24 !important; /* Amber */
+            stroke: #d97706 !important;
+            stroke-width: 3px;
+            r: 8;
+        }
+        
+        .node text {
+            font: 13px sans-serif;
+            fill: #374151;
+            /* 移除預設陰影，改用 SVG clone 疊加技術 */
+            pointer-events: none;
+        }
+        
+        .node--internal text {
+            font-weight: bold;
+            font-size: 15px;
+        }
+
+        .link {
+            fill: none;
+            stroke: #cbd5e1;
+            stroke-width: 1.5px;
+            transition: all 0.5s;
+        }
+
+        .link.matched {
+            stroke: #fbbf24;
+            stroke-width: 2px;
+        }
+
+        .node-icon-div {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: transform 0.2s;
+        }
+        
+        .node.matched .node-icon-div {
+            color: #b45309 !important;
+            transform: scale(1.2);
+        }
+
+        /* 收藏星星標記 */
+        .fav-star {
+            font-size: 10px;
+            color: #f59e0b;
+            margin-left: 4px;
+            filter: drop-shadow(0 0 1px white);
+        }
+
+        #chart-container {
+            width: 100vw;
+            height: calc(100vh - 80px);
+            cursor: grab;
+        }
+        
+        #chart-container:active {
+            cursor: grabbing;
+        }
+        
+        .office-gradient {
+            background: linear-gradient(90deg, #2b3244 0%, #3f4a63 100%);
+        }
+
+        /* --- 鍵帽樣式 --- */
+        .keycap {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 2.5rem;
+            height: 2.5rem;
+            padding: 0 0.8rem;
+            background: linear-gradient(to bottom, #ffffff, #f3f4f6);
+            border: 1px solid #d1d5db;
+            border-bottom-width: 3px;
+            border-radius: 0.4rem;
+            color: #374151;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 1rem;
+            box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+            user-select: none;
+        }
+        
+        .key-separator {
+            color: #9ca3af;
+            font-weight: bold;
+            font-size: 1rem;
+            margin: 0 0.25rem;
+        }
+
+        /* Modal Transition */
+        .modal-enter { opacity: 0; transform: scale(0.9); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: opacity 0.3s ease-out, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .modal-exit { opacity: 1; transform: scale(1); }
+        .modal-exit-active { opacity: 0; transform: scale(0.9); transition: opacity 0.2s ease-in, transform 0.2s ease-in; }
+
+        /* Toggle Switch Style */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #3b82f6;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #3b82f6;
+        }
+        
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+
+    <!-- Header -->
+    <header class="h-20 office-gradient shadow-lg flex items-center justify-between px-6 shrink-0 z-10">
+        <div class="flex items-center space-x-4">
+            <div class="flex -space-x-2">
+                <div class="bg-white p-2 rounded-full text-[#107c41] shadow-md z-30 relative border-2 border-slate-700" title="Excel"><i class="fa-solid fa-file-excel fa-lg"></i></div>
+                <div class="bg-white p-2 rounded-full text-[#185abd] shadow-md z-20 relative border-2 border-slate-700" title="Word"><i class="fa-solid fa-file-word fa-lg"></i></div>
+                <div class="bg-white p-2 rounded-full text-[#c43e1c] shadow-md z-10 relative border-2 border-slate-700" title="PowerPoint"><i class="fa-solid fa-file-powerpoint fa-lg"></i></div>
+            </div>
+            
+            <!-- OS Switcher -->
+            <div class="flex items-center bg-slate-700/50 rounded-lg p-1 border border-slate-600">
+                <button id="btn-win" onclick="setOS('win')" class="px-3 py-1 rounded text-xs font-bold transition bg-white text-slate-800 shadow">
+                    <i class="fa-brands fa-windows mr-1"></i> Win
+                </button>
+                <button id="btn-mac" onclick="setOS('mac')" class="px-3 py-1 rounded text-xs font-bold transition text-slate-300 hover:text-white">
+                    <i class="fa-brands fa-apple mr-1"></i> Mac
+                </button>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <!-- Favorites Filter Toggle -->
+            <button id="btn-fav-filter" onclick="toggleFavFilter()" class="bg-white/10 hover:bg-white/20 text-slate-300 hover:text-yellow-400 px-3 py-2 rounded-md text-sm transition border border-transparent hover:border-yellow-400/50" title="只顯示已收藏">
+                <i class="fa-solid fa-star"></i>
+            </button>
+
+            <!-- Search -->
+            <div class="relative group hidden md:block">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fa-solid fa-magnifying-glass text-gray-400"></i>
+                </div>
+                <input type="text" id="search-box" 
+                    class="block w-56 pl-10 pr-3 py-2 border-none rounded-md leading-5 bg-white bg-opacity-95 text-gray-900 placeholder-gray-500 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-300 sm:text-sm transition duration-150 ease-in-out shadow-inner" 
+                    placeholder="搜尋功能...">
+            </div>
+            
+            <!-- Controls -->
+            <div class="flex space-x-1">
+                <button onclick="resetZoom()" class="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-md text-sm transition backdrop-blur-sm" title="重置視角"><i class="fa-solid fa-compress-arrows-alt"></i></button>
+                <button onclick="expandAll()" class="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-md text-sm transition backdrop-blur-sm" title="全部展開"><i class="fa-solid fa-folder-open"></i></button>
+                 <button onclick="collapseAll()" class="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-md text-sm transition backdrop-blur-sm" title="全部收起"><i class="fa-solid fa-folder"></i></button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Chart Area -->
+    <div id="chart-container" class="bg-slate-50 relative"></div>
+
+    <!-- Help Overlay -->
+    <div class="absolute bottom-6 left-6 bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-lg border border-gray-100 text-sm text-gray-600 pointer-events-none select-none z-20">
+        <h3 class="font-bold text-gray-800 mb-2 border-b pb-1">顏色說明</h3>
+        <div class="flex items-center space-x-2 mb-1"><span class="w-3 h-3 rounded-full bg-[#107c41]"></span><span>Excel</span></div>
+        <div class="flex items-center space-x-2 mb-1"><span class="w-3 h-3 rounded-full bg-[#185abd]"></span><span>Word</span></div>
+        <div class="flex items-center space-x-2 mb-1"><span class="w-3 h-3 rounded-full bg-[#c43e1c]"></span><span>PowerPoint</span></div>
+        <div class="mt-2 text-xs text-gray-400 border-t pt-1">
+            <p>點擊<span class="font-bold text-gray-700">分類</span>展開，點擊<span class="font-bold text-gray-700">快捷鍵</span>查看詳情</p>
+        </div>
+    </div>
+
+    <!-- Shortcut Info Modal -->
+    <div id="shortcut-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center transition-all duration-300 opacity-0 pointer-events-none" onclick="closeModal()">
+        <div id="modal-content" class="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full mx-4 transform transition-all duration-300 scale-90 flex flex-col max-h-[90vh] overflow-y-auto relative" onclick="event.stopPropagation()">
+            
+            <!-- Favorite Toggle (Absolute Position) -->
+            <button id="modal-fav-btn" onclick="toggleModalFavorite()" class="absolute top-6 right-6 text-gray-300 hover:text-yellow-400 transition text-2xl focus:outline-none" title="加入/移除收藏">
+                <i class="fa-solid fa-star"></i>
+            </button>
+
+            <!-- Header Section -->
+            <div class="text-center mb-4 border-b border-gray-100 pb-4">
+                <div id="modal-icon-container" class="w-16 h-16 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3 text-3xl shadow-sm">
+                    <i id="modal-icon" class="fa-solid fa-keyboard"></i>
+                </div>
+                <h2 id="modal-title" class="text-2xl font-bold text-gray-800 mb-1">Ctrl + C</h2>
+                <p id="modal-desc" class="text-gray-500 font-medium">複製選取的內容</p>
+            </div>
+
+            <!-- Keys Visualization -->
+            <div class="bg-gray-50 rounded-xl p-4 border border-gray-200 mb-5 flex flex-wrap items-center justify-center gap-2" id="keys-container">
+                <!-- Javascript will inject keys here -->
+            </div>
+
+            <!-- Detailed Info Section -->
+            <div class="space-y-4 text-left">
+                <!-- Details -->
+                <div class="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+                    <h3 class="text-sm font-bold text-blue-800 mb-2 flex items-center">
+                        <i class="fa-solid fa-circle-info mr-2"></i>功能詳解
+                    </h3>
+                    <p id="modal-details" class="text-sm text-gray-700 leading-relaxed text-justify">
+                        <!-- Javascript will inject details here -->
+                    </p>
+                </div>
+
+                <!-- Scenario -->
+                <div class="bg-amber-50/50 p-4 rounded-lg border border-amber-100">
+                    <h3 class="text-sm font-bold text-amber-800 mb-2 flex items-center">
+                        <i class="fa-solid fa-lightbulb mr-2"></i>應用情境
+                    </h3>
+                    <p id="modal-scenario" class="text-sm text-gray-700 leading-relaxed text-justify">
+                        <!-- Javascript will inject scenario here -->
+                    </p>
+                </div>
+            </div>
+
+            <div class="text-center mt-6">
+                 <button onclick="closeModal()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition shadow-md font-medium">
+                    關閉
+                </button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- 0. Global State ---
+    let isMac = false; // true = Mac, false = Windows
+    let showFavoritesOnly = false;
+    // Load favorites from local storage
+    let favorites = new Set(JSON.parse(localStorage.getItem('office_shortcuts_favs')) || []);
+
+    // --- 1. 資料定義 ---
+    const rawData = {
+        name: "Office 快捷鍵",
+        icon: "fa-brands fa-microsoft",
+        color: "#475569", // Root color (Slate)
+        children: [
+            // ================= EXCEL =================
+            {
+                name: "Excel",
+                icon: "fa-solid fa-file-excel",
+                color: "#107c41", // Excel Green
+                children: [
+                    {
+                        name: "檔案與視窗",
+                        children: [
+                            { name: "Ctrl + N", description: "建立新活頁簿", icon: "fa-solid fa-file-circle-plus", details: "立即建立一個全新的空白 Excel 活頁簿。", scenario: "開始新專案時。" },
+                            { name: "Ctrl + O", description: "開啟舊檔", icon: "fa-regular fa-folder-open", details: "開啟檔案總管選擇檔案。", scenario: "繼續編輯舊資料。" },
+                            { name: "Ctrl + S", description: "儲存檔案", icon: "fa-regular fa-floppy-disk", details: "儲存目前進度。", scenario: "隨時防止資料遺失。" },
+                            { name: "Ctrl + W", description: "關閉活頁簿", icon: "fa-solid fa-xmark", details: "關閉目前視窗但保留 Excel。", scenario: "編輯完畢切換檔案時。" },
+                            { name: "Ctrl + P", description: "列印", icon: "fa-solid fa-print", details: "開啟列印預覽。", scenario: "輸出報表為紙本或 PDF。" },
+                            { name: "Ctrl + F1", description: "摺疊功能區", icon: "fa-solid fa-table-cells-large", details: "隱藏上方工具列以獲得更多空間。", scenario: "螢幕較小需要看更多數據時。" },
+                            { name: "Ctrl + F9", description: "最小化視窗", icon: "fa-solid fa-window-minimize", details: "將視窗縮小到工具列。", scenario: "暫時查看桌面時。" },
+                            { name: "Ctrl + Tab", description: "切換活頁簿", icon: "fa-solid fa-repeat", details: "在已開啟的 Excel 檔案間循環。", scenario: "多個檔案交叉比對資料時。" }
+                        ]
+                    },
+                    {
+                        name: "編輯與填滿",
+                        children: [
+                            { name: "Ctrl + C", description: "複製", icon: "fa-regular fa-copy", details: "複製內容到剪貼簿。", scenario: "重複使用資料。" },
+                            { name: "Ctrl + V", description: "貼上", icon: "fa-solid fa-paste", details: "貼上剪貼簿內容。", scenario: "放置資料。" },
+                            { name: "Ctrl + X", description: "剪下", icon: "fa-solid fa-scissors", details: "移動資料。", scenario: "搬移位置。" },
+                            { name: "Ctrl + Z", description: "復原", icon: "fa-solid fa-rotate-left", details: "撤銷上一步。", scenario: "修正錯誤操作。" },
+                            { name: "Ctrl + Y", description: "重做", icon: "fa-solid fa-rotate-right", details: "取消復原。", scenario: "復原過頭時。" },
+                            { name: "Ctrl + D", description: "向下填滿", icon: "fa-solid fa-arrow-down", details: "複製上方儲存格內容至此。", scenario: "快速複製整欄公式。" },
+                            { name: "Ctrl + R", description: "向右填滿", icon: "fa-solid fa-arrow-right", details: "複製左方儲存格內容至此。", scenario: "橫向表格複製公式。" },
+                            { name: "Ctrl + E", description: "快速填滿", icon: "fa-solid fa-bolt", details: "智慧偵測模式並填入資料。", scenario: "從 Email 提取姓名時。" },
+                            { name: "Ctrl + F", description: "尋找", icon: "fa-solid fa-magnifying-glass", details: "搜尋特定內容。", scenario: "在大表中找特定客戶。" },
+                            { name: "Ctrl + H", description: "取代", icon: "fa-solid fa-right-left", details: "搜尋並取代內容。", scenario: "批次修正錯誤名稱。" },
+                            { name: "Ctrl + Alt + V", description: "選擇性貼上", icon: "fa-solid fa-clipboard-check", details: "選擇貼上數值、格式或轉置。", scenario: "去除公式只留數值，或行列互換。" }
+                        ]
+                    },
+                    {
+                        name: "選取與導覽",
+                        children: [
+                            { name: "Ctrl + A", description: "全選", icon: "fa-solid fa-check-double", details: "選取整張表或資料區。", scenario: "整體格式調整。" },
+                            { name: "Ctrl + Space", description: "選取整欄", icon: "fa-solid fa-table-columns", details: "選取目前欄位。", scenario: "整欄格式設定。" },
+                            { name: "Shift + Space", description: "選取整列", icon: "fa-solid fa-table-cells", details: "選取目前列。", scenario: "刪除整筆資料。" },
+                            { name: "Ctrl + Arrow", description: "跳至邊界", icon: "fa-solid fa-forward", details: "跳到資料最邊緣。", scenario: "快速移動到表格底部。" },
+                            { name: "Ctrl + Home", description: "回到 A1", icon: "fa-solid fa-house", details: "跳回起始點。", scenario: "迷路時重置位置。" },
+                            { name: "Ctrl + End", description: "跳至最後", icon: "fa-solid fa-stop", details: "跳到已使用範圍右下角。", scenario: "檢查表格範圍。" },
+                            { name: "Ctrl + PgUp", description: "上一頁", icon: "fa-solid fa-caret-left", details: "切換到左側工作表。", scenario: "多 Sheet 切換。" },
+                            { name: "Ctrl + PgDn", description: "下一頁", icon: "fa-solid fa-caret-right", details: "切換到右側工作表。", scenario: "多 Sheet 切換。" },
+                            { name: "Ctrl + G", description: "移至", icon: "fa-solid fa-location-arrow", details: "跳轉特定位置或選取特殊儲存格。", scenario: "一次選取所有空白格。" }
+                        ]
+                    },
+                    {
+                        name: "格式設定",
+                        children: [
+                            { name: "Ctrl + 1", description: "格式視窗", icon: "fa-solid fa-list-check", details: "開啟儲存格格式對話框。", scenario: "細部調整邊框或對齊。" },
+                            { name: "Ctrl + B", description: "粗體", icon: "fa-solid fa-bold", details: "文字加粗。", scenario: "強調標題。" },
+                            { name: "Ctrl + I", description: "斜體", icon: "fa-solid fa-italic", details: "文字傾斜。", scenario: "備註說明。" },
+                            { name: "Ctrl + U", description: "底線", icon: "fa-solid fa-underline", details: "加底線。", scenario: "強調數值。" },
+                            { name: "Ctrl + 5", description: "刪除線", icon: "fa-solid fa-strikethrough", details: "文字加刪除線。", scenario: "標示已作廢項目。" },
+                            { name: "Ctrl + Shift + $", description: "貨幣格式", icon: "fa-solid fa-dollar-sign", details: "套用貨幣符號與兩位小數。", scenario: "處理金額數據。" },
+                            { name: "Ctrl + Shift + %", description: "百分比", icon: "fa-solid fa-percent", details: "套用百分比格式。", scenario: "計算達成率。" },
+                            { name: "Ctrl + Shift + #", description: "日期格式", icon: "fa-regular fa-calendar", details: "套用標準日期格式。", scenario: "修正變成數字的日期。" }
+                        ]
+                    },
+                    {
+                        name: "公式與進階",
+                        children: [
+                            { name: "Ctrl + K", description: "超連結", icon: "fa-solid fa-link", details: "插入連結。", scenario: "製作目錄跳轉。" },
+                            { name: "Ctrl + T", description: "建立表格", icon: "fa-solid fa-table", details: "轉換為 Excel 表格物件。", scenario: "使用篩選與自動樣式。" },
+                            { name: "Ctrl + `", description: "顯示公式", icon: "fa-solid fa-calculator", details: "切換顯示公式/結果。", scenario: "檢查公式邏輯。" },
+                            { name: "Ctrl + ;", description: "輸入日期", icon: "fa-solid fa-calendar-check", details: "插入當前靜態日期。", scenario: "記錄輸入日期。" },
+                            { name: "Ctrl + Shift + :", description: "輸入時間", icon: "fa-regular fa-clock", details: "插入當前靜態時間。", scenario: "打卡記錄。" },
+                            { name: "Ctrl + 9", description: "隱藏列", icon: "fa-regular fa-eye-slash", details: "隱藏選取的列。", scenario: "隱藏運算過程。" },
+                            { name: "Ctrl + 0", description: "隱藏欄", icon: "fa-regular fa-eye-slash", details: "隱藏選取的欄。", scenario: "隱藏敏感個資。" },
+                            { name: "Ctrl + -", description: "刪除", icon: "fa-solid fa-trash-can", details: "刪除選取範圍。", scenario: "移除資料。" },
+                            { name: "Ctrl + +", description: "插入", icon: "fa-solid fa-plus", details: "插入空白儲存格。", scenario: "插入新資料。" }
+                        ]
+                    }
+                ]
+            },
+            // ================= WORD =================
+            {
+                name: "Word",
+                icon: "fa-solid fa-file-word",
+                color: "#185abd", // Word Blue
+                children: [
+                    {
+                        name: "檔案與編輯",
+                        children: [
+                            { name: "Ctrl + N", description: "新文件", icon: "fa-solid fa-file", details: "建立空白文件。", scenario: "開始寫作。" },
+                            { name: "Ctrl + O", description: "開啟", icon: "fa-regular fa-folder-open", details: "開啟舊檔。", scenario: "繼續編輯。" },
+                            { name: "Ctrl + S", description: "儲存", icon: "fa-regular fa-floppy-disk", details: "儲存文件。", scenario: "防止資料遺失。" },
+                            { name: "Ctrl + P", description: "列印", icon: "fa-solid fa-print", details: "開啟列印設定。", scenario: "列印文件。" },
+                            { name: "Ctrl + C", description: "複製", icon: "fa-regular fa-copy", details: "複製文字。", scenario: "引用內容。" },
+                            { name: "Ctrl + V", description: "貼上", icon: "fa-solid fa-paste", details: "貼上內容。", scenario: "放置文字。" },
+                            { name: "Ctrl + X", description: "剪下", icon: "fa-solid fa-scissors", details: "剪下文字。", scenario: "移動段落。" },
+                            { name: "Ctrl + Z", description: "復原", icon: "fa-solid fa-rotate-left", details: "復原上一步。", scenario: "修正錯誤。" },
+                            { name: "Ctrl + Y", description: "重做", icon: "fa-solid fa-rotate-right", details: "取消復原。", scenario: "復原過頭時。" },
+                            { name: "Ctrl + F", description: "搜尋", icon: "fa-solid fa-magnifying-glass", details: "開啟導覽窗格。", scenario: "尋找關鍵字。" },
+                            { name: "Ctrl + H", description: "取代", icon: "fa-solid fa-right-left", details: "開啟取代視窗。", scenario: "批次修改詞彙。" },
+                            { name: "Ctrl + Enter", description: "分頁符號", icon: "fa-solid fa-file-import", details: "插入分頁符號。", scenario: "章節結束換頁。" },
+                            { name: "Ctrl + K", description: "超連結", icon: "fa-solid fa-link", details: "插入連結。", scenario: "引用網址。" }
+                        ]
+                    },
+                    {
+                        name: "段落格式",
+                        children: [
+                            { name: "Ctrl + L", description: "靠左", icon: "fa-solid fa-align-left", details: "靠左對齊。", scenario: "標準內文。" },
+                            { name: "Ctrl + E", description: "置中", icon: "fa-solid fa-align-center", details: "置中對齊。", scenario: "標題封面。" },
+                            { name: "Ctrl + R", description: "靠右", icon: "fa-solid fa-align-right", details: "靠右對齊。", scenario: "簽名日期。" },
+                            { name: "Ctrl + J", description: "左右對齊", icon: "fa-solid fa-align-justify", details: "分散對齊邊界。", scenario: "正式報告。" },
+                            { name: "Ctrl + M", description: "縮排", icon: "fa-solid fa-indent", details: "整段向右縮排。", scenario: "引用段落。" },
+                            { name: "Ctrl + Shift + M", description: "取消縮排", icon: "fa-solid fa-outdent", details: "減少縮排。", scenario: "恢復排版。" },
+                            { name: "Ctrl + T", description: "凸排", icon: "fa-solid fa-paragraph", details: "首行凸出。", scenario: "參考文獻。" },
+                            { name: "Ctrl + 1", description: "單行距", icon: "fa-solid fa-bars", details: "單行間距。", scenario: "緊湊版面。" },
+                            { name: "Ctrl + 2", description: "雙倍行距", icon: "fa-solid fa-bars", details: "兩倍行高。", scenario: "草稿或公文。" },
+                            { name: "Ctrl + 5", description: "1.5倍行距", icon: "fa-solid fa-bars", details: "1.5倍行高。", scenario: "舒適閱讀。" }
+                        ]
+                    },
+                    {
+                        name: "字元格式",
+                        children: [
+                            { name: "Ctrl + B", description: "粗體", icon: "fa-solid fa-bold", details: "文字加粗。", scenario: "標題強調。" },
+                            { name: "Ctrl + I", description: "斜體", icon: "fa-solid fa-italic", details: "文字傾斜。", scenario: "引用備註。" },
+                            { name: "Ctrl + U", description: "底線", icon: "fa-solid fa-underline", details: "加單底線。", scenario: "重點標示。" },
+                            { name: "Ctrl + Shift + W", description: "單字底線", icon: "fa-solid fa-window-minimize", details: "僅單字加底線。", scenario: "精緻強調。" },
+                            { name: "Ctrl + Shift + D", description: "雙底線", icon: "fa-solid fa-grip-lines", details: "雙重底線。", scenario: "強調總結。" },
+                            { name: "Ctrl + Shift + >", description: "放大", icon: "fa-solid fa-maximize", details: "快速放大文字。", scenario: "調整標題。" },
+                            { name: "Ctrl + Shift + <", description: "縮小", icon: "fa-solid fa-minimize", details: "快速縮小文字。", scenario: "微調排版。" },
+                            { name: "Ctrl + Shift + A", description: "全大寫", icon: "fa-solid fa-font", details: "轉為全大寫。", scenario: "英文標題。" },
+                            { name: "Ctrl + =", description: "下標", icon: "fa-solid fa-subscript", details: "下標文字。", scenario: "化學式。" },
+                            { name: "Ctrl + Shift + +", description: "上標", icon: "fa-solid fa-superscript", details: "上標文字。", scenario: "平方或註腳。" },
+                            { name: "Ctrl + Space", description: "清除格式", icon: "fa-solid fa-eraser", details: "移除所有格式。", scenario: "貼上後還原。" }
+                        ]
+                    },
+                    {
+                        name: "導覽與刪除",
+                        children: [
+                            { name: "Ctrl + Arrow", description: "快速移動", icon: "fa-solid fa-arrows-up-down-left-right", details: "跳單字或段落。", scenario: "快速導覽。" },
+                            { name: "Ctrl + Home", description: "文件頂端", icon: "fa-solid fa-arrow-up", details: "跳至最前。", scenario: "回標題。" },
+                            { name: "Ctrl + End", description: "文件末端", icon: "fa-solid fa-arrow-down", details: "跳至最後。", scenario: "繼續寫作。" },
+                            { name: "Ctrl + Backspace", description: "刪除左字", icon: "fa-solid fa-delete-left", details: "刪除左側單字。", scenario: "快速修改。" },
+                            { name: "Ctrl + Delete", description: "刪除右字", icon: "fa-solid fa-delete-left", details: "刪除右側單字。", scenario: "快速修改。" }
+                        ]
+                    }
+                ]
+            },
+            // ================= POWERPOINT =================
+            {
+                name: "PowerPoint",
+                icon: "fa-solid fa-file-powerpoint",
+                color: "#c43e1c", // PPT Orange
+                children: [
+                    {
+                        name: "簡報與投影片",
+                        children: [
+                            { name: "Ctrl + N", description: "新簡報", icon: "fa-solid fa-file", details: "建立新簡報。", scenario: "開始製作。" },
+                            { name: "Ctrl + O", description: "開啟", icon: "fa-regular fa-folder-open", details: "開啟舊檔。", scenario: "修改簡報。" },
+                            { name: "Ctrl + S", description: "存檔", icon: "fa-regular fa-floppy-disk", details: "儲存簡報。", scenario: "防止遺失。" },
+                            { name: "Ctrl + P", description: "列印", icon: "fa-solid fa-print", details: "列印設定。", scenario: "印講義。" },
+                            { name: "Ctrl + M", description: "新增投影片", icon: "fa-solid fa-plus-square", details: "插入新頁面。", scenario: "製作新頁。" },
+                            { name: "Ctrl + D", description: "複製投影片", icon: "fa-solid fa-copy", details: "複製整張投影片。", scenario: "保留版型。" },
+                            { name: "Ctrl + F1", description: "隱藏功能區", icon: "fa-solid fa-table-cells-large", details: "展開/收合功能區。", scenario: "增加編輯空間。" }
+                        ]
+                    },
+                    {
+                        name: "物件與繪圖",
+                        children: [
+                            { name: "Ctrl + D", description: "複製物件", icon: "fa-regular fa-clone", details: "快速複製選取項目。", scenario: "產生圖形。" },
+                            { name: "Ctrl + G", description: "群組", icon: "fa-solid fa-object-group", details: "組合物件。", scenario: "固定位置。" },
+                            { name: "Ctrl + Shift + G", description: "解群組", icon: "fa-regular fa-object-ungroup", details: "拆解群組。", scenario: "修改元件。" },
+                            { name: "Ctrl + Shift + C", description: "複製格式", icon: "fa-solid fa-brush", details: "複製樣式。", scenario: "統一風格。" },
+                            { name: "Ctrl + Shift + V", description: "貼上格式", icon: "fa-solid fa-paintbrush", details: "套用樣式。", scenario: "統一風格。" },
+                            { name: "Ctrl + Arrow", description: "微調位置", icon: "fa-solid fa-up-down-left-right", details: "像素級移動。", scenario: "精細對齊。" },
+                            { name: "Ctrl + Drag", description: "拖曳複製", icon: "fa-solid fa-copy", details: "拖曳時複製。", scenario: "直覺複製。" }
+                        ]
+                    },
+                    {
+                        name: "文字編輯",
+                        children: [
+                            { name: "Ctrl + B", description: "粗體", icon: "fa-solid fa-bold", details: "文字加粗。", scenario: "標題強調。" },
+                            { name: "Ctrl + I", description: "斜體", icon: "fa-solid fa-italic", details: "文字傾斜。", scenario: "備註說明。" },
+                            { name: "Ctrl + U", description: "底線", icon: "fa-solid fa-underline", details: "加底線。", scenario: "強調連結。" },
+                            { name: "Ctrl + Shift + >", description: "放大", icon: "fa-solid fa-maximize", details: "放大文字。", scenario: "遠處可見。" },
+                            { name: "Ctrl + Shift + <", description: "縮小", icon: "fa-solid fa-minimize", details: "縮小文字。", scenario: "塞入文字框。" },
+                            { name: "Ctrl + E", description: "置中", icon: "fa-solid fa-align-center", details: "置中對齊。", scenario: "標題排版。" },
+                            { name: "Ctrl + L", description: "靠左", icon: "fa-solid fa-align-justify", details: "靠左對齊。", scenario: "內文排版。" },
+                            { name: "Ctrl + R", description: "靠右", icon: "fa-solid fa-align-justify", details: "靠右對齊。", scenario: "內文排版。" }
+                        ]
+                    },
+                    {
+                        name: "放映控制",
+                        children: [
+                            { name: "F5", description: "從頭播放", icon: "fa-solid fa-play", details: "全螢幕放映。", scenario: "正式演講。" },
+                            { name: "Shift + F5", description: "當前頁播放", icon: "fa-solid fa-circle-play", details: "從目前頁面放映。", scenario: "彩排測試。" },
+                            { name: "Ctrl + L", description: "雷射筆", icon: "fa-solid fa-wand-magic-sparkles", details: "顯示虛擬雷射筆。", scenario: "引導視線。" },
+                            { name: "Ctrl + P", description: "畫筆", icon: "fa-solid fa-pen", details: "切換為畫筆。", scenario: "註記重點。" },
+                            { name: "Ctrl + A", description: "箭頭", icon: "fa-solid fa-arrow-pointer", details: "切換回箭頭。", scenario: "點擊連結。" },
+                            { name: "Ctrl + E", description: "橡皮擦", icon: "fa-solid fa-eraser", details: "清除註記。", scenario: "修正內容。" },
+                            { name: "Ctrl + B", description: "黑屏", icon: "fa-solid fa-square", details: "畫面全黑。", scenario: "暫停演講。" },
+                            { name: "Ctrl + W", description: "白屏", icon: "fa-regular fa-square", details: "畫面全白。", scenario: "照明輔助。" }
+                        ]
+                    }
+                ]
+            }
+        ]
+    };
+
+    // --- 2. D3 Setup ---
+    const container = document.getElementById("chart-container");
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const margin = { top: 20, right: 180, bottom: 20, left: 80 };
+    const dx = 38, dy = 210;
+    const tree = d3.tree().nodeSize([dx, dy]);
+    const diagonal = d3.linkHorizontal().x(d => d.y).y(d => d.x);
+    const svg = d3.select("#chart-container").append("svg").attr("width", width).attr("height", height).attr("viewBox", [-margin.left, -height/2, width, height]).style("font", "12px sans-serif").style("user-select", "none");
+    const gLink = svg.append("g").attr("fill", "none").attr("stroke-opacity", 0.4).attr("stroke-width", 1.5);
+    const gNode = svg.append("g").attr("cursor", "pointer").attr("pointer-events", "all");
+    const zoom = d3.zoom().scaleExtent([0.1, 3]).on("zoom", (e) => { gLink.attr("transform", e.transform); gNode.attr("transform", e.transform); });
+    svg.call(zoom).on("dblclick.zoom", null);
+
+    let root = d3.hierarchy(rawData);
+    root.x0 = 0; root.y0 = 0;
+    root.descendants().forEach((d, i) => { d.id = i; d._children = d.children; });
+    root.children.forEach(appNode => { if (appNode.children) appNode.children.forEach(catNode => { if(catNode.children) { catNode._children = catNode.children; catNode.children = null; } }); });
+    update(root); resetZoom();
+
+    function getNodeColor(d) {
+        if (d.depth === 0) return "#475569";
+        let curr = d; while (curr.depth > 1) curr = curr.parent;
+        return curr.data.color || "#475569";
+    }
+
+    // --- Helper Functions for Mac/Win & Display ---
+    function formatKey(key) {
+        if (!isMac) return key;
+        return key.replace(/Ctrl/g, '⌘')
+                  .replace(/Alt/g, '⌥')
+                  .replace(/Shift/g, '⇧')
+                  .replace(/Enter/g, '⏎')
+                  .replace(/Backspace/g, '⌫')
+                  .replace(/Delete/g, '⌦');
+    }
+
+    function setOS(os) {
+        isMac = (os === 'mac');
+        document.getElementById('btn-win').className = isMac 
+            ? "px-3 py-1 rounded text-xs font-bold transition text-slate-300 hover:text-white"
+            : "px-3 py-1 rounded text-xs font-bold transition bg-white text-slate-800 shadow";
+        document.getElementById('btn-mac').className = isMac
+            ? "px-3 py-1 rounded text-xs font-bold transition bg-white text-slate-800 shadow"
+            : "px-3 py-1 rounded text-xs font-bold transition text-slate-300 hover:text-white";
+        update(root);
+    }
+
+    function toggleFavFilter() {
+        showFavoritesOnly = !showFavoritesOnly;
+        const btn = document.getElementById('btn-fav-filter');
+        if (showFavoritesOnly) {
+            btn.classList.remove('bg-white/10', 'text-slate-300');
+            btn.classList.add('bg-yellow-400', 'text-slate-900', 'border-yellow-500');
+            applyFilters();
+        } else {
+            btn.classList.add('bg-white/10', 'text-slate-300');
+            btn.classList.remove('bg-yellow-400', 'text-slate-900', 'border-yellow-500');
+            document.getElementById('search-box').dispatchEvent(new Event('input')); 
+        }
+    }
+
+    function toggleFavorite(name) {
+        if (favorites.has(name)) {
+            favorites.delete(name);
+        } else {
+            favorites.add(name);
+        }
+        localStorage.setItem('office_shortcuts_favs', JSON.stringify(Array.from(favorites)));
+        update(root);
+    }
+
+    function applyFilters() {
+        const term = document.getElementById('search-box').value.toLowerCase();
+        root.descendants().forEach(d => d.data.isMatch = false);
+
+        if (term === "" && !showFavoritesOnly) {
+            collapseAll();
+            return;
+        }
+
+        root.descendants().forEach(d => {
+            const name = d.data.name;
+            const description = d.data.description ? d.data.description.toLowerCase() : "";
+            const details = d.data.details ? d.data.details.toLowerCase() : "";
+            
+            const textMatch = term === "" ? true : (
+                name.toLowerCase().includes(term) || 
+                description.includes(term) || 
+                details.includes(term)
+            );
+            const favMatch = showFavoritesOnly ? favorites.has(name) : true;
+
+            let isTarget = false;
+            if (!d.children && !d._children) {
+                if (textMatch && favMatch) isTarget = true;
+            } else {
+                if (term !== "" && name.toLowerCase().includes(term) && !showFavoritesOnly) {
+                    // Optional: match category names
+                }
+            }
+
+            if (isTarget) {
+                d.data.isMatch = true;
+                let curr = d;
+                while (curr.parent) {
+                    if (curr.parent._children) {
+                        curr.parent.children = curr.parent._children;
+                        curr.parent._children = null;
+                    }
+                    curr = curr.parent;
+                }
+            }
+        });
+        update(root);
+    }
+
+    function update(source) {
+        const duration = 300;
+        const nodes = root.descendants().reverse();
+        const links = root.links();
+        tree(root);
+        let left = root, right = root;
+        root.eachBefore(node => { if (node.x < left.x) left = node; if (node.x > right.x) right = node; });
+
+        const node = gNode.selectAll("g").data(nodes, d => d.id);
+        const nodeEnter = node.enter().append("g")
+            .attr("transform", d => `translate(${source.y0},${source.x0})`)
+            .attr("fill-opacity", 0)
+            .attr("stroke-opacity", 0)
+            .on("click", (e, d) => {
+                if (d.children || d._children) { d.children ? (d._children = d.children, d.children = null) : (d.children = d._children, d._children = null); update(d); }
+                else { showShortcutModal(d.data); }
+            });
+
+        nodeEnter.append("circle").attr("r", 14).attr("fill", "#fff").attr("stroke-width", 2);
+        nodeEnter.append("foreignObject").attr("width", 24).attr("height", 24).attr("x", -12).attr("y", -12).append("xhtml:div").attr("class", "node-icon-div").style("height", "100%").style("width", "100%").html(d => `<i class="${d.data.icon || 'fa-solid fa-circle'}"></i>`);
+        
+        // 1. Create MAIN Text (Foreground) - No Stroke
+        const tMain = nodeEnter.append("text")
+            .attr("class", "text-main")
+            .attr("dy", "0.35em")
+            .attr("x", d => d.children || d._children ? -20 : 20)
+            .attr("text-anchor", d => d.children || d._children ? "end" : "start")
+            .attr("stroke", "none") // Ensure no stroke
+            .attr("fill", "#374151"); // Default fill
+
+        // 2. Clone to create SHADOW Text (Background) - White Stroke
+        tMain.clone(true).lower()
+            .attr("class", "text-shadow")
+            .attr("stroke", "white")
+            .attr("stroke-width", 3)
+            .attr("fill", "none"); // No fill for shadow
+
+        // Merge selection
+        const nodesMerged = node.merge(nodeEnter);
+
+        // Update content for BOTH (Main & Shadow)
+        nodesMerged.selectAll("text")
+            .html(d => {
+                const displayName = formatKey(d.data.name);
+                const star = favorites.has(d.data.name) ? '<tspan class="fav-star" fill="#f59e0b">★</tspan>' : '';
+                if (!d.children && !d._children && d.data.description) {
+                    return `${displayName} ${star} : ${d.data.description}`;
+                }
+                return displayName + " " + star;
+            });
+
+        // Specific style updates for Main Text (Colors)
+        nodesMerged.select(".text-main")
+            .attr("fill", d => d.children ? getNodeColor(d) : "#374151");
+
+        // Transition
+        const nodeUpdate = nodesMerged.transition().duration(duration)
+            .attr("transform", d => `translate(${d.y},${d.x})`)
+            .attr("fill-opacity", 1)
+            .attr("stroke-opacity", 1)
+            .attr("class", d => (d.children ? "node node--internal" : "node") + (d.data.isMatch ? " matched" : ""));
+        
+        nodeUpdate.select("circle")
+            .attr("stroke", d => d.data.isMatch ? "#d97706" : getNodeColor(d))
+            .attr("fill", d => d.data.isMatch ? "#fef3c7" : (d._children ? getNodeColor(d) : "#fff"));
+        
+        nodeUpdate.select(".node-icon-div")
+            .style("color", d => d.data.isMatch ? "#b45309" : (d._children ? "#fff" : getNodeColor(d)));
+        
+        node.exit().transition().duration(duration).attr("transform", d => `translate(${source.y},${source.x})`).remove();
+
+        const link = gLink.selectAll("path").data(links, d => d.target.id);
+        const linkEnter = link.enter().append("path").attr("d", d => diagonal({source: {x: source.x0, y: source.y0}, target: {x: source.x0, y: source.y0}})).attr("class", "link").attr("stroke", d => getNodeColor(d.target));
+        link.merge(linkEnter).transition().duration(duration).attr("d", diagonal).attr("class", d => d.target.data.isMatch ? "link matched" : "link").attr("stroke", d => d.target.data.isMatch ? "#fbbf24" : getNodeColor(d.target));
+        link.exit().transition().duration(duration).attr("d", d => diagonal({source: {x: source.x, y: source.y}, target: {x: source.x, y: source.y}})).remove();
+        nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
+    }
+
+    const modal = document.getElementById('shortcut-modal');
+    const modalContent = document.getElementById('modal-content');
+    const keysContainer = document.getElementById('keys-container');
+    let currentModalData = null;
+
+    function showShortcutModal(data) {
+        currentModalData = data;
+        const displayName = formatKey(data.name);
+        document.getElementById('modal-title').innerText = displayName;
+        document.getElementById('modal-desc').innerText = data.description;
+        document.getElementById('modal-icon').className = data.icon || "fa-solid fa-keyboard";
+
+        keysContainer.innerHTML = '';
+        const keys = displayName.split(/[\+\/]/).map(k => k.trim());
+        keys.forEach((key, i) => {
+            const k = document.createElement('div'); k.className = 'keycap'; k.innerText = key;
+            keysContainer.appendChild(k);
+            if (i < keys.length - 1) {
+                const s = document.createElement('div'); s.className = 'key-separator'; s.innerText = '+'; keysContainer.appendChild(s);
+            }
+        });
+
+        document.getElementById('modal-details').innerText = data.details || "暫無詳細說明。";
+        document.getElementById('modal-scenario').innerText = data.scenario || "暫無特定應用情境。";
+        updateModalFavBtn();
+        modal.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+        modal.classList.add('opacity-100');
+        modalContent.classList.remove('scale-90');
+        modalContent.classList.add('scale-100');
+    }
+
+    function toggleModalFavorite() {
+        if (!currentModalData) return;
+        toggleFavorite(currentModalData.name);
+        updateModalFavBtn();
+    }
+
+    function updateModalFavBtn() {
+        const btn = document.getElementById('modal-fav-btn');
+        if (favorites.has(currentModalData.name)) {
+            btn.classList.add('text-yellow-400');
+            btn.classList.remove('text-gray-300');
+            btn.innerHTML = '<i class="fa-solid fa-star"></i>';
+        } else {
+            btn.classList.remove('text-yellow-400');
+            btn.classList.add('text-gray-300');
+            btn.innerHTML = '<i class="fa-regular fa-star"></i>';
+        }
+    }
+
+    function closeModal() {
+        modal.classList.remove('opacity-100');
+        modal.classList.add('opacity-0', 'pointer-events-none');
+        modalContent.classList.remove('scale-100');
+        modalContent.classList.add('scale-90');
+        setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    document.getElementById('search-box').addEventListener('input', applyFilters);
+    window.addEventListener("resize", () => { const w = container.clientWidth, h = container.clientHeight; svg.attr("width", w).attr("height", h).attr("viewBox", [-margin.left, -h/2, w, h]); update(root); });
+
+    function resetZoom() { svg.transition().duration(750).call(d3.zoom().transform, d3.zoomIdentity.translate(80, height/2).scale(0.85)); }
+    function expandAll() { root.descendants().forEach(d => { if(d._children) { d.children = d._children; d._children = null; } }); update(root); svg.transition().duration(750).call(d3.zoom().transform, d3.zoomIdentity.translate(100, height/2).scale(0.6)); }
+    function collapseAll() { root.children.forEach(appNode => { if(appNode.children) collapseRecursive(appNode); }); update(root); resetZoom(); }
+    function collapseRecursive(d) { if (d.children) { d._children = d.children; d._children.forEach(collapseRecursive); d.children = null; } }
+
+</script>
+</body>
+</html>
